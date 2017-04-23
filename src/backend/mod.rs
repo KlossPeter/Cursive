@@ -33,6 +33,7 @@ pub trait Backend {
     fn print_at(&self, (usize, usize), &str);
     fn clear(&self, color: theme::Color);
 
+    fn poll_event(&mut self) -> event::Event;
     fn set_refresh_rate(&mut self, fps: u32);
     // TODO: unify those into a single method?
     fn with_color<F: FnOnce()>(&self, colors: theme::ColorPair, f: F);

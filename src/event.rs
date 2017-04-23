@@ -18,6 +18,8 @@ use Cursive;
 use std::ops::Deref;
 use std::rc::Rc;
 
+use vec::Vec2;
+
 /// Callback is a function that can be triggered by an event.
 /// It has a mutable access to the cursive root.
 #[derive(Clone)]
@@ -185,6 +187,33 @@ impl Key {
     }
 }
 
+#[derive(PartialEq,Eq,Clone,Copy,Hash,Debug)]
+/// A type of mouse event
+pub enum MouseEvent {
+    /// A button was clicked.
+    Click(MouseButton),
+    /// A button was pressed.
+    Press(MouseButton),
+    /// A button was released.
+    Release(MouseButton),
+
+    /// The mousewheel was moved up.
+    WheelUp,
+    /// The mousewheel was moved down.
+    WheelDown,
+}
+
+#[derive(PartialEq,Eq,Clone,Copy,Hash,Debug)]
+/// A button on the mouse
+pub enum MouseButton {
+    /// The left button
+    Left,
+    /// The right button
+    Right,
+    /// The middle button
+    Middle,
+}
+
 /// Represents an event as seen by the application.
 #[derive(PartialEq,Eq,Clone,Hash,Debug)]
 pub enum Event {
@@ -200,6 +229,57 @@ pub enum Event {
     CtrlChar(char),
     /// A character was entered with the Alt key pressed.
     AltChar(char),
+
+    /// A mouse event.
+    Mouse {
+        /// Position of the cursor
+        pos: Vec2,
+        /// Type of mouse event fired.
+        event: MouseEvent,
+    },
+
+    /// A mouse event with the Ctrl key pressed.
+    CtrlMouse {
+        /// Position of the cursor
+        pos: Vec2,
+        /// Type of mouse event fired.
+        event: MouseEvent,
+    },
+    /// A mouse event with the Alt key pressed.
+    AltMouse {
+        /// Position of the cursor
+        pos: Vec2,
+        /// Type of mouse event fired.
+        event: MouseEvent,
+    },
+    /// A mouse event with the Shift key pressed.
+    ShiftMouse {
+        /// Position of the cursor
+        pos: Vec2,
+        /// Type of mouse event fired.
+        event: MouseEvent,
+    },
+    /// A mouse event with the Ctrl and Alt keys pressed.
+    CtrlAltMouse {
+        /// Position of the cursor
+        pos: Vec2,
+        /// Type of mouse event fired.
+        event: MouseEvent,
+    },
+    /// A mouse event with the Shift key pressed.
+    CtrlShiftMouse {
+        /// Position of the cursor
+        pos: Vec2,
+        /// Type of mouse event fired.
+        event: MouseEvent,
+    },
+    /// A mouse event with the Shift key pressed.
+    AltShiftMouse {
+        /// Position of the cursor
+        pos: Vec2,
+        /// Type of mouse event fired.
+        event: MouseEvent,
+    },
 
     /// A non-character key was pressed.
     Key(Key),
