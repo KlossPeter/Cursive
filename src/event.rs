@@ -190,8 +190,6 @@ impl Key {
 #[derive(PartialEq,Eq,Clone,Copy,Hash,Debug)]
 /// A type of mouse event
 pub enum MouseEvent {
-    /// A button was clicked.
-    Click(MouseButton),
     /// A button was pressed.
     Press(MouseButton),
     /// A button was released.

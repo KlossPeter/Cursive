@@ -150,6 +150,12 @@ impl From<(i32, i32)> for XY<usize> {
     }
 }
 
+impl From<(u16, u16)> for XY<usize> {
+    fn from((x, y): (u16, u16)) -> Self {
+        (x as usize, y as usize).into()
+    }
+}
+
 impl From<(u32, u32)> for XY<usize> {
     fn from((x, y): (u32, u32)) -> Self {
         (x as usize, y as usize).into()

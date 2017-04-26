@@ -5,22 +5,29 @@ extern crate chan_signal;
 use self::termion::color as tcolor;
 use self::termion::event::Event as TEvent;
 use self::termion::event::Key as TKey;
-use self::termion::input::TermRead;
-use self::termion::raw::IntoRawMode;
+use self::termion::event::MouseButton as TMouseButton;
+use self::termion::event::MouseEvent as TMouseEvent;
+use self::termion::input::{MouseTerminal, TermRead};
+use self::termion::raw::{IntoRawMode, RawTerminal};
 use self::termion::screen::AlternateScreen;
 use self::termion::style as tstyle;
+
 use backend;
 use chan;
-use event::{Event, Key};
+use event::{Event, Key, MouseEvent, MouseButton};
+
 use std::cell::Cell;
 use std::io::Write;
 use std::thread;
 
 use theme;
+use vec::Vec2;
 
 pub struct Concrete {
-    terminal: AlternateScreen<termion::raw::RawTerminal<::std::io::Stdout>>,
-    current_style: Cell<theme::ColorPair>,
+    terminal: AlternateScreen<MouseTerminal<RawTerminal<::std::io::Stdout>>>,
+    current_style: Cell<theme::ColorStyle>,
+    colors: BTreeMap<i16, (Box<tcolor::Color>, Box<tcolor::Color>)>,
+
     input: chan::Receiver<Event>,
     resize: chan::Receiver<chan_signal::Signal>,
     timeout: Option<u32>,
@@ -60,14 +67,14 @@ impl backend::Backend for Concrete {
 
         let resize = chan_signal::notify(&[chan_signal::Signal::WINCH]);
 
-        let terminal = AlternateScreen::from(::std::io::stdout()
-                                                 .into_raw_mode()
-                                                 .unwrap());
+        let raw = ::std::io::stdout().into_raw_mode().unwrap();
+        let terminal = AlternateScreen::from(MouseTerminal::from(raw));
         let (sender, receiver) = chan::async();
 
+        let mut pressed_btn = None;
         thread::spawn(move || for key in ::std::io::stdin().events() {
                           if let Ok(key) = key {
-                              sender.send(map_key(key))
+                              sender.send(map_key(key, &mut pressed_btn))
                           }
                       });
 
@@ -164,7 +171,7 @@ impl backend::Backend for Concrete {
     }
 }
 
-fn map_key(event: TEvent) -> Event {
+fn map_key(event: TEvent, pressed_btn: &mut Option<MouseButton>) -> Event {
     match event {
         TEvent::Unsupported(bytes) => Event::Unknown(bytes),
         TEvent::Key(TKey::Esc) => Event::Key(Key::Esc),
@@ -187,9 +194,51 @@ fn map_key(event: TEvent) -> Event {
         TEvent::Key(TKey::Ctrl('c')) => Event::Exit,
         TEvent::Key(TKey::Ctrl(c)) => Event::CtrlChar(c),
         TEvent::Key(TKey::Alt(c)) => Event::AltChar(c),
+        TEvent::Mouse(TMouseEvent::Hold(_, _)) => Event::Refresh,
+        TEvent::Mouse(TMouseEvent::Release(x, y)) if pressed_btn.is_some() => {
+            Event::Mouse {
+                pos: Vec2::from((x, y)),
+                event: MouseEvent::Release(pressed_btn.unwrap()),
+            }
+        }
+        TEvent::Mouse(TMouseEvent::Press(btn, x, y)) => {
+            Event::Mouse {
+                pos: Vec2::from((x, y)),
+                event: if is_wheel(btn) {
+                    translate_wheel(btn)
+                } else {
+                    let btn = translate_btn(btn);
+                    *pressed_btn = Some(btn);
+                    MouseEvent::Press(btn)
+                },
+            }
+        }
         _ => Event::Unknown(vec![]),
     }
+}
 
+fn is_wheel(btn: TMouseButton) -> bool {
+    match btn {
+        TMouseButton::WheelUp | TMouseButton::WheelDown => true,
+        _ => false,
+    }
+}
+
+fn translate_wheel(btn: TMouseButton) -> MouseEvent {
+    match btn {
+        TMouseButton::WheelUp => MouseEvent::WheelUp,
+        TMouseButton::WheelDown => MouseEvent::WheelDown,
+        _ => panic!("not a wheel button"),
+    }
+}
+
+fn translate_btn(btn: TMouseButton) -> MouseButton {
+    match btn {
+        TMouseButton::Left => MouseButton::Left,
+        TMouseButton::Middle => MouseButton::Middle,
+        TMouseButton::Right => MouseButton::Right,
+        TMouseButton::WheelUp | TMouseButton::WheelDown => panic!("not a valid button"),
+    }
 }
 
 fn with_color<F, R>(clr: &theme::Color, f: F) -> R
