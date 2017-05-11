@@ -302,6 +302,66 @@ pub enum Event {
     Exit,
 }
 
+impl Event {
+    /// Returns the position of the mouse.
+    ///
+    /// If this event is not a mouse event, returns `None`.
+    pub fn mouse_position(&self) -> Option<Vec2> {
+        match *self {
+            Event::Mouse { pos, .. } |
+            Event::CtrlMouse { pos, .. } |
+            Event::ShiftMouse { pos, .. } |
+            Event::AltMouse { pos, .. } |
+            Event::CtrlShiftMouse { pos, .. } |
+            Event::CtrlAltMouse { pos, .. } => Some(pos),
+            _ => None,
+        }
+    }
+
+    /// Updates self to be relative to the given context.
+    ///
+    /// If `self` is a mouse event with coordinates that fit in the given
+    /// window, substract `top_left` from the position.
+    ///
+    /// Otherwise, do nothing.
+    pub fn relativize(&mut self, top_left: Vec2) {
+        match *self {
+            Event::Mouse { ref mut pos, .. } |
+            Event::CtrlMouse { ref mut pos, .. } |
+            Event::ShiftMouse { ref mut pos, .. } |
+            Event::AltMouse { ref mut pos, .. } |
+            Event::CtrlShiftMouse { ref mut pos, .. } |
+            Event::CtrlAltMouse { ref mut pos, .. } => {
+                *pos = *pos - top_left;
+            }
+            _ => (),
+        }
+    }
+
+    /// Attempt to create a new event relative to the given viewport
+    ///
+    /// If `self` is a mouse event with coordinates that fit in the given
+    /// window, returns an event with the position relative to the window.
+    ///
+    /// Otherwise, returns `None`.
+    pub fn make_relative(&self, top_left: Vec2, size: Vec2) -> Option<Self> {
+        // First, this only applies to mouse events
+        self.mouse_position().and_then(|pos| {
+            if !top_left.fits_in(pos) {
+                // We are too high or too far left
+                None
+            } else if !(pos < (top_left + size)) {
+                // We are too low or too far right
+                None
+            } else {
+                let mut clone = self.clone();
+                clone.relativize(top_left);
+                Some(clone)
+            }
+        })
+    }
+}
+
 impl From<char> for Event {
     fn from(c: char) -> Event {
         Event::Char(c)
