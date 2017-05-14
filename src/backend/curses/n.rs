@@ -5,7 +5,7 @@ use backend;
 use std::cell::{RefCell, Cell};
 use std::collections::HashMap;
 use event::{Event, Key, MouseEvent, MouseButton};
-use theme::{Color, ColorStyle, Effect};
+use theme::{Color, ColorPair, Effect};
 use utf8;
 use vec::Vec2;
 

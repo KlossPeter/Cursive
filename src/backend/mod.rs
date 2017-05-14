@@ -26,13 +26,12 @@ pub trait Backend {
     fn has_colors(&self) -> bool;
     fn screen_size(&self) -> (usize, usize);
 
-    /// Main input method
-    fn poll_event(&self) -> event::Event;
 
     /// Main method used for printing
     fn print_at(&self, (usize, usize), &str);
     fn clear(&self, color: theme::Color);
 
+    /// Main input method
     fn poll_event(&mut self) -> event::Event;
     fn set_refresh_rate(&mut self, fps: u32);
     // TODO: unify those into a single method?

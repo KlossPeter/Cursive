@@ -2,12 +2,15 @@ use Printer;
 use theme::ColorStyle;
 use vec::Vec2;
 use view::{View, ViewWrapper};
+use event::{Event, EventResult};
 
 /// Wrapper view that adds a shadow.
 ///
 /// It reserves a 1 pixel border on each side.
 pub struct ShadowView<T: View> {
     view: T,
+
+    // Top and left padding can be toggled for precise view placement
     top_padding: bool,
     left_padding: bool,
 }
@@ -22,6 +25,9 @@ impl<T: View> ShadowView<T> {
         }
     }
 
+    /// Returns the padding used for this view.
+    ///
+    /// Sums both top-left and bottom-right padding.
     fn padding(&self) -> Vec2 {
         Vec2::new(1 + self.left_padding as usize,
                   1 + self.top_padding as usize)
@@ -56,6 +62,12 @@ impl<T: View> ViewWrapper for ShadowView<T> {
     fn wrap_layout(&mut self, size: Vec2) {
         let offset = self.padding();
         self.view.layout(size.saturating_sub(offset));
+    }
+
+    fn wrap_on_event(&mut self, event: Event) -> EventResult {
+        event
+            .make_relative(Vec2::new(1, 1), None)
+            .map_or(EventResult::Ignored, |event| self.view.on_event(event))
     }
 
     fn wrap_draw(&self, printer: &Printer) {

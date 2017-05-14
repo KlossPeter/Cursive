@@ -344,21 +344,28 @@ impl Event {
     /// window, returns an event with the position relative to the window.
     ///
     /// Otherwise, returns `None`.
-    pub fn make_relative(&self, top_left: Vec2, size: Vec2) -> Option<Self> {
+    pub fn make_relative(&self, top_left: Vec2, size: Option<Vec2>)
+                         -> Option<Self> {
         // First, this only applies to mouse events
-        self.mouse_position().and_then(|pos| {
-            if !top_left.fits_in(pos) {
-                // We are too high or too far left
-                None
-            } else if !(pos < (top_left + size)) {
-                // We are too low or too far right
-                None
-            } else {
-                let mut clone = self.clone();
-                clone.relativize(top_left);
-                Some(clone)
+        match self.mouse_position() {
+            None => Some(self.clone()),
+            Some(pos) => {
+                if !top_left.fits_in(pos) {
+                    // println_stderr!("{:?} fits in {:?}", top_left, pos);
+                    // We are too high or too far left
+                    None
+                } else if size.map(|size| !(pos < (top_left + size)))
+                              .unwrap_or(false) {
+                    // println_stderr!("{:?} < {:?} + {:?}", pos, top_left, size);
+                    // We are too low or too far right
+                    None
+                } else {
+                    let mut clone = self.clone();
+                    clone.relativize(top_left);
+                    Some(clone)
+                }
             }
-        })
+        }
     }
 }
 

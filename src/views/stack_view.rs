@@ -1,6 +1,6 @@
 use Printer;
 
-use ::With;
+use With;
 use direction::Direction;
 use event::{Event, EventResult};
 use std::any::Any;
@@ -40,9 +40,11 @@ impl Placement {
 struct Child {
     view: Box<View>,
     size: Vec2,
+    position: Vec2,
     placement: Placement,
 
-    // We cannot call `take_focus` until we've called `layout()`
+    // We cannot call `take_focus` until we've called `layout()`.
+    // (Because focusability depends on the scrollability.)
     // So we want to call `take_focus` right after the first call
     // to `layout`; this flag remembers when we've done that.
     virgin: bool,
@@ -65,12 +67,14 @@ impl StackView {
     pub fn add_fullscreen_layer<T>(&mut self, view: T)
         where T: 'static + View
     {
-        self.layers.push(Child {
-            view: Box::new(Layer::new(view)),
-            size: Vec2::zero(),
-            placement: Placement::Fullscreen,
-            virgin: true,
-        });
+        self.layers
+            .push(Child {
+                      view: Box::new(Layer::new(view)),
+                      size: Vec2::zero(),
+                      position: Vec2::zero(),
+                      placement: Placement::Fullscreen,
+                      virgin: true,
+                  });
     }
 
     /// Adds new view on top of the stack in the center of the screen.
@@ -102,15 +106,19 @@ impl StackView {
     pub fn add_layer_at<T>(&mut self, position: Position, view: T)
         where T: 'static + View
     {
-        self.layers.push(Child {
-            // Skip padding for absolute/parent-placed views
-            view: Box::new(ShadowView::new(Layer::new(view))
-                .top_padding(position.y == Offset::Center)
-                .left_padding(position.x == Offset::Center)),
-            size: Vec2::new(0, 0),
-            placement: Placement::Floating(position),
-            virgin: true,
-        });
+        self.layers
+            .push(Child {
+                      // Skip padding for absolute/parent-placed views
+                      view: Box::new(ShadowView::new(Layer::new(view))
+                                         .top_padding(position.y ==
+                                                      Offset::Center)
+                                         .left_padding(position.x ==
+                                                       Offset::Center)),
+                      size: Vec2::zero(),
+                      position: Vec2::zero(),
+                      placement: Placement::Floating(position),
+                      virgin: true,
+                  });
     }
 
     /// Adds a view on top of the stack.
@@ -131,8 +139,10 @@ impl StackView {
     pub fn offset(&self) -> Vec2 {
         let mut previous = Vec2::zero();
         for layer in &self.layers {
-            let offset = layer.placement
-                .compute_offset(layer.size, self.last_size, previous);
+            let offset =
+                layer
+                    .placement
+                    .compute_offset(layer.size, self.last_size, previous);
             previous = offset;
         }
         previous
@@ -152,8 +162,8 @@ impl View for StackView {
             for (i, v) in self.layers.iter().enumerate() {
                 // Place the view
                 // Center the view
-                let offset = v.placement
-                    .compute_offset(v.size, printer.size, previous);
+                let offset =
+                    v.placement.compute_offset(v.size, printer.size, previous);
 
                 previous = offset;
                 v.view
@@ -163,10 +173,20 @@ impl View for StackView {
     }
 
     fn on_event(&mut self, event: Event) -> EventResult {
-        match self.layers.last_mut() {
-            None => EventResult::Ignored,
-            Some(v) => v.view.on_event(event),
-        }
+        // Get the active layer, if any
+        self.layers
+            .last_mut()
+            .and_then(|v| {
+                // Then relativize and apply the event
+                // (mostly for mouse events, this means rejecting clicks
+                // outside of the child, and offseting the mouse position)
+                event
+                    .make_relative(v.position, Some(v.size))
+                    .map(|event| v.view.on_event(event))
+            })
+            // If we don't have any child,
+            // or if the event was rejected, ignore it
+            .unwrap_or(EventResult::Ignored)
     }
 
     fn layout(&mut self, size: Vec2) {
@@ -174,12 +194,20 @@ impl View for StackView {
 
         // The call has been made, we can't ask for more space anymore.
         // Let's make do with what we have.
+        let mut previous = Vec2::zero();
 
         for layer in &mut self.layers {
             // Give each guy what he asks for, within the budget constraints.
             let size = Vec2::min(size, layer.view.required_size(size));
             layer.size = size;
             layer.view.layout(layer.size);
+
+            let offset =
+                layer
+                    .placement
+                    .compute_offset(layer.size, self.last_size, previous);
+            layer.position = offset;
+            previous = offset;
 
             // We need to call `layout()` on the view before giving it focus
             // for the first time. Otherwise it will not be properly set up.
@@ -209,9 +237,11 @@ impl View for StackView {
     }
 
     fn call_on_any<'a>(&mut self, selector: &Selector,
-                    mut callback: Box<FnMut(&mut Any) + 'a>) {
+                       mut callback: Box<FnMut(&mut Any) + 'a>) {
         for layer in &mut self.layers {
-            layer.view.call_on_any(selector, Box::new(|any| callback(any)));
+            layer
+                .view
+                .call_on_any(selector, Box::new(|any| callback(any)));
         }
     }
 
